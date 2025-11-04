@@ -107,6 +107,8 @@ class OBSManager:
                 "--disable-crash-handler",
                 "--disable-updater",
                 "--disable-shutdown-check",  # Prevents Safe Mode dialog from appearing
+                "--always-on-top=no",  # Don't force always on top
+                "--safe-mode",  # Force normal mode (not safe mode)
                 # Removed --minimize-to-tray to keep OBS interface visible
             ]
             
