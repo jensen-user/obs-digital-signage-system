@@ -1,0 +1,6 @@
+obsws-python==1.8.0
+webdav4==0.10.0
+pygame==2.5.2
+psutil==5.9.6
+watchdog==3.0.0
+pywin32==306; sys_platform == "win32"
