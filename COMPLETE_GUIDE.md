@@ -184,6 +184,9 @@ cd ~
 ```bash
 git clone https://github.com/jensen-user/obs-digital-signage-system.git
 cd obs-digital-signage-system
+
+# Make scripts executable (REQUIRED on Linux)
+chmod +x install.sh start.sh
 ```
 
 **Option B: If you have a zip file**
@@ -191,15 +194,12 @@ cd obs-digital-signage-system
 ```bash
 unzip obs-digital-signage-automation-system.zip
 cd obs-digital-signage-automation-system
-```
 
-### Step 6: Make Scripts Executable
-
-```bash
+# Make scripts executable (REQUIRED on Linux)
 chmod +x install.sh start.sh
 ```
 
-### Step 7: Run Installation Script
+### Step 6: Run Installation Script
 
 ```bash
 ./install.sh
@@ -1027,6 +1027,22 @@ ERROR: Failed to create scene for corrupted.mp4     # File issue
 ---
 
 ## Troubleshooting
+
+### Permission Denied When Running Scripts (Ubuntu)
+
+**Symptom:** `bash: ./install.sh: Permission denied`
+
+**Solution:**
+```bash
+# Make scripts executable
+chmod +x install.sh start.sh
+
+# Then run
+./install.sh
+```
+
+**Why This Happens:**
+Files cloned from Git don't have execute permissions by default on Linux. The `chmod +x` command makes them executable.
 
 ### OBS Won't Start Automatically
 
