@@ -60,8 +60,16 @@ fi
 echo ""
 echo -e "${GREEN}[3/6]${NC} Creating virtual environment..."
 if [ -d "venv" ]; then
-    echo "Virtual environment already exists, skipping creation"
-else
+    # Check if venv is valid (has activate script)
+    if [ ! -f "venv/bin/activate" ]; then
+        echo -e "${YELLOW}[WARNING]${NC} Virtual environment is corrupted, recreating..."
+        rm -rf venv
+    else
+        echo "Virtual environment already exists, skipping creation"
+    fi
+fi
+
+if [ ! -d "venv" ]; then
     python3 -m venv venv 2>&1 | tee /tmp/venv_error.log
     if [ $? -ne 0 ]; then
         echo -e "${RED}[ERROR]${NC} Failed to create virtual environment"
@@ -70,7 +78,7 @@ else
             echo "The python3-venv package is missing."
             echo ""
             echo "Install it with:"
-            echo -e "${YELLOW}  sudo apt install python3-venv${NC}"
+            echo -e "${YELLOW}  sudo apt install python3-venv -y${NC}"
             echo ""
             echo "Then run this installation script again:"
             echo "  ./install.sh"
@@ -109,6 +117,11 @@ echo -e "${GREEN}[7/7]${NC} Setting up configuration files..."
 if [ ! -f "config/ubuntu_prod.env" ]; then
     echo "Creating config/ubuntu_prod.env from example..."
     cp "config/ubuntu_prod.env.example" "config/ubuntu_prod.env"
+
+    # Automatically set CONTENT_BASE_DIR to current directory
+    CURRENT_DIR=$(pwd)
+    sed -i "s|CONTENT_BASE_DIR=.*|CONTENT_BASE_DIR=$CURRENT_DIR|" "config/ubuntu_prod.env"
+
     echo -e "${YELLOW}[IMPORTANT]${NC} Please edit config/ubuntu_prod.env with your credentials!"
 else
     echo "config/ubuntu_prod.env already exists, skipping"
@@ -120,13 +133,25 @@ echo " Installation Complete!"
 echo "===================================================================="
 echo ""
 echo -e "${YELLOW}IMPORTANT: Configure your settings before running!${NC}"
-echo "  1. Edit config/ubuntu_prod.env with your credentials:"
-echo "     - OBS_PASSWORD (if OBS WebSocket has password)"
-echo "     - WEBDAV_HOST, WEBDAV_USERNAME, WEBDAV_PASSWORD"
-echo "     - Or leave WebDAV settings empty for offline mode"
-echo "  2. Install OBS Studio if not already installed:"
-echo "       sudo apt install obs-studio"
-echo "  3. Run ./start.sh to launch the system"
+echo ""
+echo "1. Edit your configuration file:"
+echo -e "   ${GREEN}nano config/ubuntu_prod.env${NC}"
+echo ""
+echo "   Update these settings:"
+echo "   - OBS_PASSWORD (OBS WebSocket password)"
+echo "   - WEBDAV_HOST, WEBDAV_USERNAME, WEBDAV_PASSWORD"
+echo "   - Or leave WebDAV settings empty for offline mode"
+echo ""
+echo "   Press Ctrl+X, then Y, then Enter to save"
+echo ""
+echo "2. Install OBS Studio if not already installed:"
+echo -e "   ${GREEN}sudo apt install obs-studio -y${NC}"
+echo ""
+echo "3. View the README for more information:"
+echo -e "   ${GREEN}cat README.md${NC}"
+echo ""
+echo "4. Start the system:"
+echo -e "   ${GREEN}./start.sh${NC}"
 echo ""
 echo "For detailed documentation, see README.md"
 echo ""

@@ -91,12 +91,23 @@ echo  Installation Complete!
 echo ====================================================================
 echo.
 echo IMPORTANT: Configure your settings before running!
-echo   1. Edit config\windows_test.env with your credentials:
-echo      - OBS_PASSWORD (if OBS WebSocket has password)
-echo      - WEBDAV_HOST, WEBDAV_USERNAME, WEBDAV_PASSWORD
-echo      - Or leave WebDAV settings empty for offline mode
-echo   2. Install OBS Studio if not already installed
-echo   3. Run START.bat to launch the system
+echo.
+echo 1. Edit your configuration file:
+echo    notepad config\windows_test.env
+echo.
+echo    Update these settings:
+echo    - OBS_PASSWORD (OBS WebSocket password)
+echo    - WEBDAV_HOST, WEBDAV_USERNAME, WEBDAV_PASSWORD
+echo    - Or leave WebDAV settings empty for offline mode
+echo.
+echo 2. Install OBS Studio if not already installed:
+echo    Download from: https://obsproject.com/download
+echo.
+echo 3. View the README for more information:
+echo    type README.md
+echo.
+echo 4. Start the system:
+echo    START.bat
 echo.
 echo For detailed documentation, see README.md
 echo.

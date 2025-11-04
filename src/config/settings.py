@@ -57,11 +57,13 @@ class Settings:
     
     def _setup_paths(self) -> None:
         """Setup platform-specific paths."""
-        # Base directories  
+        # Base directories
         if self.platform == "windows":
             base_dir = Path(os.getenv("CONTENT_BASE_DIR", "C:/Users/User/Desktop/obs-slideshow"))
         else:
-            base_dir = Path(os.getenv("CONTENT_BASE_DIR", "/opt/digital-signage"))
+            # Default to current directory if not specified (no sudo needed)
+            default_path = str(Path(__file__).parent.parent.parent)
+            base_dir = Path(os.getenv("CONTENT_BASE_DIR", default_path))
         
         # Ensure base directory exists
         base_dir.mkdir(parents=True, exist_ok=True)
