@@ -104,7 +104,8 @@ class OBSManager:
             # OBS command line arguments for digital signage
             cmd_args = [
                 str(obs_path),
-                "--safe-mode",  # Force safe mode (disables all plugins for stability)
+                # Note: --disable-shutdown-check removed in OBS 32.0+
+                # Delete .sentinel folder instead (see Linux section)
             ]
             
             self.logger.info(f"Launching OBS with command: {' '.join(cmd_args)}")
@@ -152,14 +153,16 @@ class OBSManager:
                 env = os.environ.copy()
                 env['DISPLAY'] = ':0'
 
-                # Remove OBS safe mode flag file to prevent safe mode dialog
-                safe_mode_file = Path.home() / ".config/obs-studio/safe_mode"
-                if safe_mode_file.exists():
+                # Remove OBS .sentinel folder to prevent safe mode dialog
+                # OBS 32.0+ removed --disable-shutdown-check, so delete .sentinel folder
+                sentinel_folder = Path.home() / ".config/obs-studio/.sentinel"
+                if sentinel_folder.exists():
                     try:
-                        safe_mode_file.unlink()
-                        self.logger.debug("Removed OBS safe mode flag file")
+                        import shutil
+                        shutil.rmtree(sentinel_folder)
+                        self.logger.info("Deleted .sentinel folder to prevent safe mode dialog")
                     except Exception as e:
-                        self.logger.warning(f"Could not remove safe mode flag: {e}")
+                        self.logger.warning(f"Could not remove .sentinel folder: {e}")
 
                 self.obs_process = subprocess.Popen(
                     cmd_args,
