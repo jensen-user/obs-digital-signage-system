@@ -62,9 +62,20 @@ echo -e "${GREEN}[3/6]${NC} Creating virtual environment..."
 if [ -d "venv" ]; then
     echo "Virtual environment already exists, skipping creation"
 else
-    python3 -m venv venv
+    python3 -m venv venv 2>&1 | tee /tmp/venv_error.log
     if [ $? -ne 0 ]; then
         echo -e "${RED}[ERROR]${NC} Failed to create virtual environment"
+        echo ""
+        if grep -q "ensurepip is not available" /tmp/venv_error.log; then
+            echo "The python3-venv package is missing."
+            echo ""
+            echo "Install it with:"
+            echo -e "${YELLOW}  sudo apt install python3-venv${NC}"
+            echo ""
+            echo "Then run this installation script again:"
+            echo "  ./install.sh"
+        fi
+        echo ""
         exit 1
     fi
 fi

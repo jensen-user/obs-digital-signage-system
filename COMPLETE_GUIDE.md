@@ -1044,6 +1044,22 @@ chmod +x install.sh start.sh
 **Why This Happens:**
 Files cloned from Git don't have execute permissions by default on Linux. The `chmod +x` command makes them executable.
 
+### Virtual Environment Creation Failed (Ubuntu)
+
+**Symptom:** `ensurepip is not available` or `Failed to create virtual environment`
+
+**Solution:**
+```bash
+# Install python3-venv package
+sudo apt install python3-venv -y
+
+# Then run installation again
+./install.sh
+```
+
+**Why This Happens:**
+Ubuntu doesn't include the `venv` module by default. The `python3-venv` package is required to create virtual environments.
+
 ### OBS Won't Start Automatically
 
 **Symptom:** System reports "OBS Studio executable not found"
