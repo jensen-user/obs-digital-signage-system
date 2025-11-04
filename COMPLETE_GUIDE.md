@@ -80,6 +80,7 @@ The OBS Digital Signage Automation System is a professional digital signage solu
 - Python 3.10 or higher
 - OBS Studio 28+ with WebSocket v5
 - FFmpeg (for video duration detection)
+- Git (for downloading from GitHub)
 
 **Ubuntu Specific:**
 - Ubuntu Desktop 20.04 LTS or newer
@@ -102,12 +103,20 @@ sudo apt update
 sudo apt upgrade -y
 ```
 
-### Step 2: Install Python 3
+### Step 2: Install Required Software
 
-Ubuntu usually comes with Python 3, but verify:
+Install Python 3, Git, and other dependencies:
 
 ```bash
+# Install Python 3 and pip
+sudo apt install python3 python3-pip python3-venv -y
+
+# Install Git (for downloading from GitHub)
+sudo apt install git -y
+
+# Verify installations
 python3 --version
+git --version
 ```
 
 Should show Python 3.10 or higher. If not, install:
@@ -170,17 +179,17 @@ obs --version
 cd ~
 ```
 
-If you have the system as a zip file:
+**Option A: Clone from GitHub (Recommended)**
+
+```bash
+git clone https://github.com/jensen-user/obs-digital-signage-system.git
+cd obs-digital-signage-system
+```
+
+**Option B: If you have a zip file**
 
 ```bash
 unzip obs-digital-signage-automation-system.zip
-cd obs-digital-signage-automation-system
-```
-
-Or if cloning from Git:
-
-```bash
-git clone <repository-url>
 cd obs-digital-signage-automation-system
 ```
 

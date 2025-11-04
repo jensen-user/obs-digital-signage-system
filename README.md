@@ -56,8 +56,8 @@ Edit your configuration file:
 - **Windows**: `config/windows_test.env`
 
 ```ini
-# OBS Settings
-OBS_PASSWORD=
+# OBS WebSocket Settings
+OBS_PASSWORD=  # Set in OBS: Tools > WebSocket Server Settings
 
 # WebDAV (leave empty for offline mode)
 WEBDAV_HOST=https://your-nas.com
