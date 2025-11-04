@@ -37,7 +37,7 @@ if [ $? -ne 0 ]; then
 fi
 
 # Set environment to use production config
-export DIGITAL_SIGNAGE_ENV=ubuntu_prod
+export ENVIRONMENT=production
 
 # Run the application
 echo -e "${GREEN}[2/2]${NC} Starting Digital Signage System..."
