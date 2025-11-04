@@ -154,7 +154,16 @@ class OBSManager:
                 # Linux environment setup
                 env = os.environ.copy()
                 env['DISPLAY'] = ':0'
-                
+
+                # Remove OBS safe mode flag file to prevent safe mode dialog
+                safe_mode_file = Path.home() / ".config/obs-studio/safe_mode"
+                if safe_mode_file.exists():
+                    try:
+                        safe_mode_file.unlink()
+                        self.logger.debug("Removed OBS safe mode flag file")
+                    except Exception as e:
+                        self.logger.warning(f"Could not remove safe mode flag: {e}")
+
                 self.obs_process = subprocess.Popen(
                     cmd_args,
                     cwd=str(obs_working_dir),  # Critical: Set working directory
