@@ -104,12 +104,7 @@ class OBSManager:
             # OBS command line arguments for digital signage
             cmd_args = [
                 str(obs_path),
-                "--disable-crash-handler",
-                "--disable-updater",
-                "--disable-shutdown-check",  # Prevents Safe Mode dialog from appearing
-                "--always-on-top=no",  # Don't force always on top
-                "--safe-mode",  # Force normal mode (not safe mode)
-                # Removed --minimize-to-tray to keep OBS interface visible
+                "--safe-mode",  # Force safe mode (disables all plugins for stability)
             ]
             
             self.logger.info(f"Launching OBS with command: {' '.join(cmd_args)}")
