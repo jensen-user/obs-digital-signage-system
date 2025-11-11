@@ -71,8 +71,9 @@ DEFAULT_TRANSITION_OFFSET=0.5
 - `config/windows_prod.env` - **NEW** - Windows production configuration
 
 **Important Path Fix**:
-- ⚠️ **Ubuntu**: Changed `CONTENT_BASE_DIR=/opt/digital-signage` → `/home/obs_slideshow/digital-signage`
+- ⚠️ **Ubuntu**: Changed `CONTENT_BASE_DIR=/opt/digital-signage` → `/home/obs_slideshow/obs-digital-signage-system`
 - Fixes permission errors for non-root users
+- **Recommended**: Use project directory to keep everything in one place (avoid creating separate `digital-signage` folder)
 
 ### 🐛 Bug Fixes
 
@@ -184,9 +185,13 @@ MANUAL_CONTENT_FOLDER=
 2. **Update config files manually** (not tracked by git):
    - Add scheduling section to your config file
    - Fix `WEBDAV_ROOT_PATH=/vaeveriet_screens_slideshow` (if using WebDAV)
-   - Ubuntu: Change `CONTENT_BASE_DIR` to home directory path
-3. **Install new dependency**: `pip install tzdata>=2024.1` (or run `./install.sh` again)
-4. **Create folder structure** (if using scheduling):
+   - **Ubuntu**: Change `CONTENT_BASE_DIR=/home/obs_slideshow/obs-digital-signage-system` (use project directory, not separate folder)
+3. **Clean up old folders** (Ubuntu only, if you had separate digital-signage folder):
+   ```bash
+   rm -rf ~/digital-signage  # Optional: remove old separate folder
+   ```
+4. **Install new dependency**: `pip install tzdata>=2024.1` (or run `./install.sh` again)
+5. **Create folder structure** (if using scheduling):
    ```bash
    mkdir -p vaeveriet_screens_slideshow/sunday_service_slideshow
    mkdir -p vaeveriet_screens_slideshow/default_slideshow

@@ -57,6 +57,10 @@ Edit your configuration file:
 - **Windows Production**: `config/windows_prod.env`
 
 ```ini
+# Base directory (Ubuntu: use project directory to keep everything together)
+CONTENT_BASE_DIR=/home/obs_slideshow/obs-digital-signage-system  # Ubuntu
+CONTENT_BASE_DIR=C:\Users\User\DevProjects\obs-digital-signage-automation-system  # Windows
+
 # OBS WebSocket Settings
 OBS_PASSWORD=88884444  # Set in OBS: Tools > WebSocket Server Settings
 
@@ -228,6 +232,23 @@ WEBDAV_ROOT_PATH/
 ---
 
 ## 🐛 Troubleshooting
+
+### Multiple Folders Created (Ubuntu)
+
+**Problem**: You see both `obs-digital-signage-system/` and `digital-signage/` folders.
+
+**Solution**:
+1. Edit `config/ubuntu_prod.env`:
+   ```ini
+   CONTENT_BASE_DIR=/home/obs_slideshow/obs-digital-signage-system
+   ```
+2. Delete the separate folder:
+   ```bash
+   rm -rf ~/digital-signage
+   ```
+3. Restart the system - everything will be in `obs-digital-signage-system/`
+
+**Why**: `CONTENT_BASE_DIR` should point to the project directory to keep everything together.
 
 ### OBS Won't Connect
 
