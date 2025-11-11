@@ -177,3 +177,14 @@ class Settings:
         )
         self.DEFAULT_TRANSITION = os.getenv("DEFAULT_TRANSITION", "Fade")
         self.DEFAULT_TRANSITION_OFFSET = float(os.getenv("DEFAULT_TRANSITION_OFFSET", "0.5"))
+
+        # Manual content folder override (when scheduling is disabled)
+        # Example: "vaeveriet_screens_slideshow/sunday_service_slideshow"
+        manual_folder_env = os.getenv("MANUAL_CONTENT_FOLDER", "")
+        if manual_folder_env and not self.SCHEDULE_ENABLED:
+            self.MANUAL_CONTENT_FOLDER = base_dir / manual_folder_env
+            # Override CONTENT_DIR to use the manual folder
+            self.CONTENT_DIR = self.MANUAL_CONTENT_FOLDER
+            # Note: logging happens later in main.py when logger is initialized
+        else:
+            self.MANUAL_CONTENT_FOLDER = None

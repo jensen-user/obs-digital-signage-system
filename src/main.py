@@ -88,6 +88,14 @@ class DigitalSignageSystem:
                 self.logger.info(f"Initial schedule active: {self.scheduler.current_schedule.name}")
                 self.logger.info(f"  Content folder: {initial_folder}")
                 self.logger.info(f"  Transition: {initial_transition}")
+            else:
+                # Scheduling is disabled
+                if self.settings.MANUAL_CONTENT_FOLDER:
+                    self.logger.info("Scheduling disabled - using manual content folder override")
+                    self.logger.info(f"  Content folder: {self.settings.MANUAL_CONTENT_FOLDER}")
+                else:
+                    self.logger.info("Scheduling disabled - using default content folder")
+                    self.logger.info(f"  Content folder: {self.settings.CONTENT_DIR}")
 
             # 3. Initialize Content Manager (before WebDAV so we can pass callback)
             self.logger.info("Initializing content management...")
