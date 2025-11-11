@@ -35,11 +35,21 @@ class Settings:
     def _get_env_file(self) -> Path:
         """Get environment configuration file."""
         config_dir = Path(__file__).parent.parent.parent / "config"
-        
+
+        # Determine config file based on platform and environment
         if self.ENVIRONMENT == "production":
-            return config_dir / "ubuntu_prod.env"
+            if self.platform == "windows":
+                env_file = config_dir / "windows_prod.env"
+            else:
+                env_file = config_dir / "ubuntu_prod.env"
         else:
-            return config_dir / "windows_test.env"
+            # Development/testing
+            if self.platform == "windows":
+                env_file = config_dir / "windows_test.env"
+            else:
+                env_file = config_dir / "ubuntu_prod.env"  # Ubuntu uses production config
+
+        return env_file
     
     def _load_env_file(self, env_file: Path) -> None:
         """Load environment variables from file."""

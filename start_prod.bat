@@ -1,14 +1,17 @@
 @echo off
-title OBS Digital Signage System (Development)
+title OBS Digital Signage System (Production)
 echo ===================================================
-echo OBS Digital Signage Automation System - DEVELOPMENT
-echo ===================================================
-echo Using development configuration (windows_test.env)
-echo For production, use start_prod.bat instead
+echo OBS Digital Signage Automation System - PRODUCTION
 echo ===================================================
 echo.
 
 cd /d "%~dp0"
+
+REM Set production environment
+set ENVIRONMENT=production
+
+echo Using production configuration (windows_prod.env)
+echo.
 
 echo Checking OBS connection...
 echo.
