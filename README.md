@@ -52,17 +52,24 @@ Double-click INSTALL.bat
 ### 3. Configure
 
 Edit your configuration file:
-- **Ubuntu**: `config/ubuntu_prod.env`
-- **Windows**: `config/windows_test.env`
+- **Ubuntu Production**: `config/ubuntu_prod.env`
+- **Windows Development**: `config/windows_test.env`
+- **Windows Production**: `config/windows_prod.env`
 
 ```ini
 # OBS WebSocket Settings
-OBS_PASSWORD=  # Set in OBS: Tools > WebSocket Server Settings
+OBS_PASSWORD=88884444  # Set in OBS: Tools > WebSocket Server Settings
 
 # WebDAV (leave empty for offline mode)
 WEBDAV_HOST=https://your-nas.com
 WEBDAV_USERNAME=your_username
 WEBDAV_PASSWORD=your_password
+WEBDAV_ROOT_PATH=/your_content_folder
+
+# Scheduling (optional - automatic content switching)
+SCHEDULE_ENABLED=true
+TIMEZONE=Europe/Copenhagen
+MANUAL_CONTENT_FOLDER=  # For testing: set folder when SCHEDULE_ENABLED=false
 ```
 
 **⚠️ SECURITY NOTE:** Config files are protected by `.gitignore` and won't be uploaded to GitHub.
@@ -74,9 +81,19 @@ WEBDAV_PASSWORD=your_password
 ./start.sh
 ```
 
-**Windows:**
+**Windows (Development/Testing):**
 ```
-Double-click START.bat
+Double-click start.bat
+```
+
+**Windows (Production):**
+```
+Double-click start_prod.bat
+```
+
+**Manual Content Testing:**
+```
+Double-click test_manual_folder.bat  (Windows only - tests sunday_service_slideshow)
 ```
 
 ---
@@ -109,13 +126,23 @@ This comprehensive guide includes:
 
 ### Content Management
 - **Supported formats**: MP4, MOV, AVI, JPG, PNG, MP3, WAV
-- **Cloud sync**: Automatic WebDAV synchronization every 30 seconds
+- **Cloud sync**: Automatic WebDAV synchronization every 30 seconds with recursive subfolder scanning
 - **Offline mode**: Works without internet connection
 - **Auto-detection**: FFprobe reads video durations automatically
 - **Hot reload**: Add/remove content while running
 
+### 🆕 Time-Based Scheduling
+- **Automatic content switching**: Different content for different times/days
+- **Smart transitions**: Different OBS transitions for each schedule
+- **Timezone support**: Accurate scheduling with timezone awareness (Europe/Copenhagen)
+- **Sunday Service mode**: Special schedule for 08:00-13:30 Sundays with Stinger transitions
+- **Default mode**: Fallback schedule for all other times with Fade transitions
+- **Manual override**: `MANUAL_CONTENT_FOLDER` for testing specific content without scheduling
+- **No restart required**: Content and transitions switch automatically
+
 ### Display & Transitions
 - **Professional transitions**: Stinger transitions for smooth content changes
+- **Dynamic transition control**: Automatically switch between Fade, Cut, Stinger based on schedule
 - **Dual monitor support**: Control on one screen, display on another
 - **Full HD**: Native 1920x1080 support
 - **Customizable timing**: Configure image display time and transition offset
@@ -139,21 +166,56 @@ This comprehensive guide includes:
 | `WEBDAV_SYNC_INTERVAL` | 30 | Sync interval in seconds |
 | `OBS_STARTUP_DELAY` | 15 | Wait time for OBS to start |
 
+### 🆕 Scheduling Settings
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `SCHEDULE_ENABLED` | true | Enable/disable automatic scheduling |
+| `TIMEZONE` | Europe/Copenhagen | Timezone for schedule calculations |
+| `SCHEDULE_CHECK_INTERVAL` | 60 | How often to check for schedule changes (seconds) |
+| `MANUAL_CONTENT_FOLDER` | (empty) | Override folder when scheduling disabled |
+| `SUNDAY_SERVICE_DAY` | 6 | Day of week for Sunday (0=Monday, 6=Sunday) |
+| `SUNDAY_SERVICE_START_TIME` | 08:00 | Sunday service start time |
+| `SUNDAY_SERVICE_END_TIME` | 13:30 | Sunday service end time |
+| `SUNDAY_SERVICE_FOLDER` | vaeveriet_screens_slideshow/sunday_service_slideshow | Sunday content folder |
+| `SUNDAY_SERVICE_TRANSITION` | Stinger Transition | Sunday transition type |
+| `DEFAULT_FOLDER` | vaeveriet_screens_slideshow/default_slideshow | Default content folder |
+| `DEFAULT_TRANSITION` | Fade | Default transition type |
+
 **See [COMPLETE_GUIDE.md](COMPLETE_GUIDE.md#system-configuration) for all settings.**
 
 ---
 
 ## 📁 Adding Content
 
-### Method 1: WebDAV/Cloud Sync (Recommended)
+### Method 1: WebDAV/Cloud Sync with Scheduling (Recommended)
 
-1. Upload files to your WebDAV server (Synology NAS, etc.)
+**Folder Structure:**
+```
+WEBDAV_ROOT_PATH/
+├── sunday_service_slideshow/     # Content for Sunday 08:00-13:30
+│   ├── 01_welcome.jpg
+│   └── 02_service_info.mp4
+└── default_slideshow/             # Content for all other times
+    ├── 01_welcome.jpg
+    └── 02_announcement.mp4
+```
+
+1. Upload files to your WebDAV server in the appropriate subfolder
+2. Files automatically download within 30 seconds (with subfolder structure preserved)
+3. System switches content automatically based on schedule
+
+**Unicode Support:** ✓ Supports Danish characters (æ, ø, å) and spaces in filenames
+
+### Method 2: WebDAV/Cloud Sync (Simple)
+
+1. Upload files to your WebDAV root path
 2. Files automatically download within 30 seconds
 3. System creates scenes and starts rotation
 
-### Method 2: Manual/Offline
+### Method 3: Manual/Offline
 
-1. Place files in the `content/` folder
+1. Place files in the `content/` folder (or scheduled folder if using scheduling)
 2. Restart system or wait for automatic scan
 3. Content appears in rotation
 
@@ -161,6 +223,7 @@ This comprehensive guide includes:
 - **Images**: 1920x1080, JPG format
 - **Videos**: 1920x1080, MP4 H.264 format, under 15 minutes
 - **File naming**: Use numbers for order (e.g., `01_welcome.jpg`, `02_video.mp4`)
+- **Scheduling**: Organize content in subfolders (sunday_service_slideshow, default_slideshow)
 
 ---
 

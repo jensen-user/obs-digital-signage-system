@@ -4,6 +4,196 @@ All notable changes to the OBS Digital Signage Automation System.
 
 ---
 
+## [2.1.0] - 2025-11-11
+
+### 🎉 Time-Based Scheduling Feature
+
+Major feature release adding automatic content switching based on time and day of week.
+
+### ✅ New Features
+
+**Time-Based Scheduling System**
+- **Automatic content switching** - Different content folders for different schedules
+- **Dynamic OBS transitions** - Switch transitions (Fade, Stinger, Cut) based on schedule
+- **Timezone support** - Accurate time calculations with zoneinfo (Europe/Copenhagen)
+- **Sunday Service mode** - Special schedule for Sundays 08:00-13:30 with Stinger transitions
+- **Default mode** - Fallback schedule for all other times with Fade transitions
+- **Schedule monitoring** - Checks every 60 seconds for schedule changes
+- **No restart required** - Content and transitions switch automatically in real-time
+- **New file**: `src/core/scheduler.py` - Complete scheduling implementation (280 lines)
+- **New file**: `test_scheduler.py` - Test script for scheduler validation
+
+**Manual Content Override**
+- **`MANUAL_CONTENT_FOLDER`** setting for testing specific content without scheduling
+- **Works when `SCHEDULE_ENABLED=false`** - Perfect for testing individual folders
+- **Example**: Set to `vaeveriet_screens_slideshow/sunday_service_slideshow` to test Sunday content
+- **New file**: `test_manual_folder.bat` - Quick test script for Windows
+
+**Windows Production Configuration**
+- **`config/windows_prod.env`** - Production config for Windows deployments
+- **`start_prod.bat`** - Production start script (sets `ENVIRONMENT=production`)
+- **Platform-aware config loading** - Automatically selects correct config file
+- **Updated `start.bat`** - Clarified it's for development/testing
+
+**WebDAV Improvements**
+- **Recursive directory scanning** - Syncs files in all subfolders automatically
+- **Subfolder structure preserved** - Maintains folder hierarchy during sync
+- **Unicode support** - Fixed Danish characters (æ, ø, å) and spaces in filenames
+- **Simplified URL handling** - Let webdav4 library handle encoding internally
+
+### 🔧 Configuration Changes
+
+**New Environment Variables** (all platforms):
+```ini
+# Scheduling
+SCHEDULE_ENABLED=true
+TIMEZONE=Europe/Copenhagen
+SCHEDULE_CHECK_INTERVAL=60
+MANUAL_CONTENT_FOLDER=
+
+# Sunday Service Schedule (day 6 = Sunday per ISO 8601)
+SUNDAY_SERVICE_FOLDER=vaeveriet_screens_slideshow/sunday_service_slideshow
+SUNDAY_SERVICE_START_TIME=08:00
+SUNDAY_SERVICE_END_TIME=13:30
+SUNDAY_SERVICE_TRANSITION=Stinger Transition
+SUNDAY_SERVICE_TRANSITION_OFFSET=2.0
+SUNDAY_SERVICE_DAY=6
+
+# Default Schedule
+DEFAULT_FOLDER=vaeveriet_screens_slideshow/default_slideshow
+DEFAULT_TRANSITION=Fade
+DEFAULT_TRANSITION_OFFSET=0.5
+```
+
+**Updated Config Files**:
+- `config/windows_test.env` - Added scheduling section with MANUAL_CONTENT_FOLDER
+- `config/ubuntu_prod.env` - Added scheduling section, fixed WEBDAV_ROOT_PATH
+- `config/windows_prod.env` - **NEW** - Windows production configuration
+
+**Important Path Fix**:
+- ⚠️ **Ubuntu**: Changed `CONTENT_BASE_DIR=/opt/digital-signage` → `/home/obs_slideshow/digital-signage`
+- Fixes permission errors for non-root users
+
+### 🐛 Bug Fixes
+
+**OBS Transition API**
+- **Problem**: Wrong parameter name in `set_current_scene_transition()` call
+- **Solution**: Use positional argument instead of `transition_name=` keyword
+- **File**: `src/core/obs_manager.py` lines 541, 549, 556
+
+**Settings Attribute Missing**
+- **Problem**: `CONTENT_BASE_DIR` attribute not stored in Settings class
+- **Solution**: Added `self.CONTENT_BASE_DIR = base_dir` for WebDAV client
+- **File**: `src/config/settings.py` line 70
+
+**WebDAV Directory Scanning**
+- **Problem**: Only scanned top-level directory, missed files in subfolders
+- **Solution**: Implemented recursive `_scan_remote_directory()` method
+- **File**: `src/core/webdav_client.py` lines 151-195
+
+**WebDAV File Downloads**
+- **Problem**: URL encoding issues with Danish characters caused download failures
+- **Solution**: Removed manual encoding, let webdav4 library handle it
+- **File**: `src/core/webdav_client.py` lines 248-264
+
+### 📝 Code Changes
+
+**Modified Files**:
+- `src/config/settings.py` - Added scheduling settings, MANUAL_CONTENT_FOLDER, platform-aware config loading
+- `src/core/obs_manager.py` - Added `set_transition()` method (lines 522-567)
+- `src/core/content_manager.py` - Added `switch_content_folder()` method (lines 615-660)
+- `src/core/webdav_client.py` - Recursive scanning, URL encoding fixes
+- `src/main.py` - Integrated scheduler, schedule monitoring loop (lines 72-98, 263-295)
+- `requirements.txt` - Added `tzdata>=2024.1` for timezone support
+- `start.bat` - Updated to clarify development mode
+
+**New Files**:
+- `src/core/scheduler.py` - Complete scheduling system
+- `test_scheduler.py` - Scheduler test script
+- `test_manual_folder.bat` - Manual content testing script
+- `config/windows_prod.env` - Windows production config
+- `start_prod.bat` - Windows production launcher
+- `CHANGELOG.md` - This file (updated)
+
+### 📊 Testing Results
+
+**Schedule Logic**:
+- ✅ Sunday detection working (day 6 = Sunday)
+- ✅ Time range checking (08:00-13:30)
+- ✅ Timezone calculations correct (Europe/Copenhagen)
+- ✅ Schedule switching at correct times
+
+**WebDAV Sync**:
+- ✅ Recursive subfolder scanning working
+- ✅ All 5 test files synced successfully
+- ✅ Danish characters working: `Vælgermøde 2025 infoskærm.png`
+- ✅ Spaces in filenames working: `Velkommen i aabenkirke.png`
+- ✅ Subfolder structure preserved
+
+**OBS Integration**:
+- ✅ Transition switching working (Fade ↔ Stinger)
+- ✅ Content folder switching without restart
+- ✅ Scenes created correctly for scheduled content
+
+**Cross-Platform**:
+- ✅ Windows: Development (windows_test.env) and Production (windows_prod.env)
+- ✅ Ubuntu: Production (ubuntu_prod.env)
+- ✅ Config file selection working on both platforms
+
+### 📁 Config File Matrix
+
+```
+┌──────────┬─────────────────────┬──────────────────────┐
+│ Platform │ Development         │ Production           │
+├──────────┼─────────────────────┼──────────────────────┤
+│ Windows  │ windows_test.env    │ windows_prod.env ✓   │
+│ Ubuntu   │ ubuntu_prod.env     │ ubuntu_prod.env      │
+└──────────┴─────────────────────┴──────────────────────┘
+```
+
+### 🚀 Usage Examples
+
+**Automatic Scheduling** (Sunday Service + Default):
+```ini
+SCHEDULE_ENABLED=true
+```
+System automatically switches at 08:00 Sunday and back at 13:30.
+
+**Manual Testing** (Sunday Service content):
+```ini
+SCHEDULE_ENABLED=false
+MANUAL_CONTENT_FOLDER=vaeveriet_screens_slideshow/sunday_service_slideshow
+```
+Or run `test_manual_folder.bat` on Windows.
+
+**Disable Scheduling** (use default content folder):
+```ini
+SCHEDULE_ENABLED=false
+MANUAL_CONTENT_FOLDER=
+```
+
+### 📋 Known Issues
+
+**None** - All features tested and working.
+
+### 🔄 Upgrade Notes
+
+**From 2.0.0 to 2.1.0**:
+
+1. **Pull latest code**: `git pull origin main`
+2. **Update config files manually** (not tracked by git):
+   - Add scheduling section to your config file
+   - Fix `WEBDAV_ROOT_PATH=/vaeveriet_screens_slideshow` (if using WebDAV)
+   - Ubuntu: Change `CONTENT_BASE_DIR` to home directory path
+3. **Install new dependency**: `pip install tzdata>=2024.1` (or run `./install.sh` again)
+4. **Create folder structure** (if using scheduling):
+   ```bash
+   mkdir -p vaeveriet_screens_slideshow/sunday_service_slideshow
+   mkdir -p vaeveriet_screens_slideshow/default_slideshow
+   ```
+
+---
+
 ## [2.0.0] - 2025-11-04
 
 ### 🎉 Production Release - Fully Tested on Ubuntu 24.04
@@ -212,6 +402,7 @@ This release includes extensive testing and bug fixes for Ubuntu deployment.
 
 ## Version History
 
+- **2.1.0** (2025-11-11) - Time-based scheduling, WebDAV improvements, Windows production config
 - **2.0.0** (2025-11-04) - Production release with Ubuntu fixes
 - **1.0.0** (2025-10-28) - Initial release
 
