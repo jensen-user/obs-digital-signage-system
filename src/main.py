@@ -21,6 +21,7 @@ from core.content_manager import ContentManager
 from core.audio_manager import AudioManager
 from core.webdav_client import WebDAVClient
 from core.file_monitor import FileMonitor
+from core.scheduler import Scheduler
 from utils.logging_config import setup_logging
 from utils.system_utils import SystemUtils
 
@@ -43,6 +44,7 @@ class DigitalSignageSystem:
         self.audio_manager: Optional[AudioManager] = None
         self.webdav_client: Optional[WebDAVClient] = None
         self.file_monitor: Optional[FileMonitor] = None
+        self.scheduler: Optional[Scheduler] = None
         
         # Setup signal handlers for graceful shutdown
         if platform.system() != "Windows":
@@ -67,7 +69,27 @@ class DigitalSignageSystem:
             if not await self.obs_manager.initialize():
                 raise Exception("Failed to initialize OBS Studio connection")
 
-            # 2. Initialize Content Manager (before WebDAV so we can pass callback)
+            # 2. Initialize Scheduler (if enabled)
+            if self.settings.SCHEDULE_ENABLED:
+                self.logger.info("Initializing scheduler...")
+                self.scheduler = Scheduler(self.settings)
+
+                # Get initial schedule
+                initial_folder = self.scheduler.get_current_content_folder()
+                initial_offset = self.scheduler.get_current_transition_offset()
+                initial_transition = self.scheduler.get_current_transition_type()
+
+                # Override content folder with scheduled folder
+                self.settings.CONTENT_DIR = initial_folder
+
+                # Set initial transition in OBS
+                await self.obs_manager.set_transition(initial_transition)
+
+                self.logger.info(f"Initial schedule active: {self.scheduler.current_schedule.name}")
+                self.logger.info(f"  Content folder: {initial_folder}")
+                self.logger.info(f"  Transition: {initial_transition}")
+
+            # 3. Initialize Content Manager (before WebDAV so we can pass callback)
             self.logger.info("Initializing content management...")
             self.content_manager = ContentManager(self.settings, self.obs_manager)
             await self.content_manager.initialize()
@@ -143,7 +165,11 @@ class DigitalSignageSystem:
         
         # Audio monitoring task (every 30 seconds)
         tasks.append(asyncio.create_task(self._audio_monitoring_loop()))
-        
+
+        # Schedule monitoring task (if enabled)
+        if self.settings.SCHEDULE_ENABLED and self.scheduler:
+            tasks.append(asyncio.create_task(self._schedule_monitoring_loop()))
+
         try:
             # Run until shutdown signal
             while self.running:
@@ -227,13 +253,47 @@ class DigitalSignageSystem:
                 if self.audio_manager and not self.audio_manager.is_healthy():
                     self.logger.warning("Audio system unhealthy - attempting recovery")
                     await self.audio_manager.recover()
-                
+
                 await asyncio.sleep(30)  # Audio check every 30 seconds
-                
+
             except Exception as e:
                 self.logger.error(f"Audio monitoring error: {e}")
                 await asyncio.sleep(60)
-    
+
+    async def _schedule_monitoring_loop(self) -> None:
+        """Schedule monitoring and automatic content switching."""
+        while self.running:
+            try:
+                if self.scheduler and self.scheduler.check_schedule_change():
+                    # Schedule changed - switch content folder and transition
+                    new_folder = self.scheduler.get_current_content_folder()
+                    new_offset = self.scheduler.get_current_transition_offset()
+                    new_transition = self.scheduler.get_current_transition_type()
+
+                    self.logger.info(f"Schedule change detected:")
+                    self.logger.info(f"  New schedule: {self.scheduler.current_schedule.name}")
+                    self.logger.info(f"  Content folder: {new_folder}")
+                    self.logger.info(f"  Transition: {new_transition}")
+                    self.logger.info(f"  Transition offset: {new_offset}s")
+
+                    # Set new transition in OBS
+                    await self.obs_manager.set_transition(new_transition)
+
+                    # Switch content folder
+                    await self.content_manager.switch_content_folder(new_folder, new_offset)
+
+                    # Resync background audio
+                    await self.audio_manager.scan_and_start_audio()
+
+                    self.logger.info("Schedule switch completed successfully")
+
+                # Check every SCHEDULE_CHECK_INTERVAL seconds
+                await asyncio.sleep(self.settings.SCHEDULE_CHECK_INTERVAL)
+
+            except Exception as e:
+                self.logger.error(f"Schedule monitoring error: {e}")
+                await asyncio.sleep(60)  # Longer delay on error
+
     async def shutdown(self) -> None:
         """Graceful system shutdown."""
         self.logger.info("Starting graceful shutdown...")

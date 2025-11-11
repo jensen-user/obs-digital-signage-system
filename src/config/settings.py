@@ -20,6 +20,7 @@ class Settings:
         self._setup_webdav_settings()
         self._setup_media_settings()
         self._setup_system_settings()
+        self._setup_schedule_settings()
         
     def _load_environment_config(self) -> None:
         """Load configuration from environment variables."""
@@ -64,15 +65,18 @@ class Settings:
             # Default to current directory if not specified (no sudo needed)
             default_path = str(Path(__file__).parent.parent.parent)
             base_dir = Path(os.getenv("CONTENT_BASE_DIR", default_path))
-        
+
+        # Store CONTENT_BASE_DIR for use by other components (e.g., WebDAV)
+        self.CONTENT_BASE_DIR = base_dir
+
         # Ensure base directory exists
         base_dir.mkdir(parents=True, exist_ok=True)
-        
+
         # Ensure directories exist
         self.CONTENT_DIR = base_dir / "content"
         self.LOG_DIR = base_dir / "logs"
         self.CONFIG_DIR = base_dir / "config"
-        
+
         # Create directories
         for directory in [self.CONTENT_DIR, self.LOG_DIR, self.CONFIG_DIR]:
             directory.mkdir(parents=True, exist_ok=True)
@@ -128,10 +132,48 @@ class Settings:
         self.LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
         self.LOG_MAX_SIZE = int(os.getenv("LOG_MAX_SIZE", "10485760"))  # 10MB
         self.LOG_BACKUP_COUNT = int(os.getenv("LOG_BACKUP_COUNT", "5"))
-        
+
         # System monitoring
         self.HEALTH_CHECK_INTERVAL = int(os.getenv("HEALTH_CHECK_INTERVAL", "60"))  # seconds
         self.MAX_RESTART_ATTEMPTS = int(os.getenv("MAX_RESTART_ATTEMPTS", "3"))
-        
+
         # File monitoring
         self.FILE_MONITOR_DELAY = float(os.getenv("FILE_MONITOR_DELAY", "2.0"))  # seconds
+
+    def _setup_schedule_settings(self) -> None:
+        """Setup time-based scheduling configuration."""
+        # Enable/disable scheduling feature
+        schedule_enabled_str = os.getenv("SCHEDULE_ENABLED", "false").lower()
+        self.SCHEDULE_ENABLED = schedule_enabled_str in ("true", "1", "yes", "on")
+
+        # Timezone for schedule calculations
+        self.TIMEZONE = os.getenv("TIMEZONE", "Europe/Copenhagen")
+
+        # Schedule check interval (how often to check for schedule changes)
+        self.SCHEDULE_CHECK_INTERVAL = int(os.getenv("SCHEDULE_CHECK_INTERVAL", "60"))
+
+        # Get base directory for content folders
+        if self.platform == "windows":
+            base_dir = Path(os.getenv("CONTENT_BASE_DIR", "C:/Users/User/Desktop/obs-slideshow"))
+        else:
+            default_path = str(Path(__file__).parent.parent.parent)
+            base_dir = Path(os.getenv("CONTENT_BASE_DIR", default_path))
+
+        # Sunday Service Schedule
+        self.SUNDAY_SERVICE_FOLDER = base_dir / os.getenv(
+            "SUNDAY_SERVICE_FOLDER",
+            "vaeveriet_screens_slideshow/sunday_service_slideshow"
+        )
+        self.SUNDAY_SERVICE_START_TIME = os.getenv("SUNDAY_SERVICE_START_TIME", "08:00")
+        self.SUNDAY_SERVICE_END_TIME = os.getenv("SUNDAY_SERVICE_END_TIME", "13:30")
+        self.SUNDAY_SERVICE_TRANSITION = os.getenv("SUNDAY_SERVICE_TRANSITION", "Stinger Transition")
+        self.SUNDAY_SERVICE_TRANSITION_OFFSET = float(os.getenv("SUNDAY_SERVICE_TRANSITION_OFFSET", "2.0"))
+        self.SUNDAY_SERVICE_DAY = int(os.getenv("SUNDAY_SERVICE_DAY", "6"))  # 6 = Sunday
+
+        # Default Schedule (fallback)
+        self.DEFAULT_FOLDER = base_dir / os.getenv(
+            "DEFAULT_FOLDER",
+            "vaeveriet_screens_slideshow/default_slideshow"
+        )
+        self.DEFAULT_TRANSITION = os.getenv("DEFAULT_TRANSITION", "Fade")
+        self.DEFAULT_TRANSITION_OFFSET = float(os.getenv("DEFAULT_TRANSITION_OFFSET", "0.5"))

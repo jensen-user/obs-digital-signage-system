@@ -58,20 +58,24 @@ class ContentManager:
         self.settings = settings
         self.obs_manager = obs_manager
         self.logger = logging.getLogger(__name__)
-        
+
         # Content state
         self.media_files: List[MediaFile] = []
         self.current_index = 0
         self.playback_start_time = 0.0
         self.current_scene: Optional[str] = None
         self.rotation_active = False
-        
+
         # Tracking for cleanup
         self.managed_scenes: Set[str] = set()
         self.managed_inputs: Set[str] = set()
-        
+
         # Content change detection
         self.content_hash = ""
+
+        # Dynamic content folder and transition offset (for scheduling)
+        self.content_folder = settings.CONTENT_DIR
+        self.transition_offset = settings.TRANSITION_START_OFFSET
         
     async def initialize(self) -> None:
         """Initialize content manager."""
@@ -154,12 +158,12 @@ class ContentManager:
     async def _scan_content_directory(self) -> List[MediaFile]:
         """Scan directory for supported media files."""
         media_files = []
-        
+
         try:
-            for file_path in self.settings.CONTENT_DIR.iterdir():
+            for file_path in self.content_folder.iterdir():
                 if file_path.is_file():
                     media_file = MediaFile(file_path, self.settings)
-                    
+
                     # Only include video and image files (audio handled separately)
                     if media_file.is_video or media_file.is_image:
                         # Validate file is not corrupted
@@ -167,10 +171,10 @@ class ContentManager:
                             media_files.append(media_file)
                         else:
                             self.logger.warning(f"Skipping corrupted file: {file_path.name}")
-            
+
         except Exception as e:
             self.logger.error(f"Error scanning content directory: {e}")
-        
+
         return media_files
     
     async def _validate_media_file(self, media_file: MediaFile) -> bool:
@@ -555,10 +559,10 @@ class ContentManager:
             
             current_media = self.media_files[self.current_index]
 
-            # MANUAL TRANSITION TIMING (configured in settings):
+            # MANUAL TRANSITION TIMING (configured in settings or scheduler):
             # User controls exactly when transition starts via TRANSITION_START_OFFSET
             # Example: 2.0 = start transition 2 seconds before media ends
-            transition_offset = self.settings.TRANSITION_START_OFFSET
+            transition_offset = self.transition_offset
 
             if current_media.is_video:
                 # For videos: Start transition BEFORE video ends
@@ -611,7 +615,54 @@ class ContentManager:
 
         except Exception as e:
             self.logger.error(f"Failed to switch to media {index}: {e}")
-    
+
+    async def switch_content_folder(self, new_folder: Path, transition_offset: float) -> bool:
+        """
+        Switch to a different content folder dynamically (for scheduling).
+
+        Args:
+            new_folder: Path to new content folder
+            transition_offset: New transition offset for timing
+
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            old_folder = self.content_folder
+            self.logger.info(f"Switching content folder: {old_folder.name} → {new_folder.name}")
+
+            # Update internal properties
+            self.content_folder = new_folder
+            self.transition_offset = transition_offset
+
+            # Create folder if it doesn't exist
+            new_folder.mkdir(parents=True, exist_ok=True)
+
+            # Temporarily override settings for scan
+            original_content_dir = self.settings.CONTENT_DIR
+            original_transition_offset = self.settings.TRANSITION_START_OFFSET
+
+            try:
+                self.settings.CONTENT_DIR = new_folder
+                self.settings.TRANSITION_START_OFFSET = transition_offset
+
+                # Rescan and update content
+                await self.scan_and_update_content()
+
+                self.logger.info(f"Content folder switched successfully to: {new_folder.name}")
+                return True
+
+            finally:
+                # Restore original settings
+                self.settings.CONTENT_DIR = original_content_dir
+                self.settings.TRANSITION_START_OFFSET = original_transition_offset
+
+        except Exception as e:
+            self.logger.error(f"Failed to switch content folder: {e}")
+            # Revert to old folder on error
+            self.content_folder = old_folder
+            return False
+
     async def on_content_change(self, file_path: Path) -> None:
         """Handle content change events from file monitor."""
         try:

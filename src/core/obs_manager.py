@@ -518,7 +518,54 @@ class OBSManager:
         except Exception as e:
             self.logger.error(f"Failed to get media status for {input_name}: {e}")
             return None
-    
+
+    async def set_transition(self, transition_name: str) -> bool:
+        """
+        Set the current scene transition.
+
+        Args:
+            transition_name: Name of the transition to activate (e.g., "Fade", "Stinger Transition")
+
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            # Get list of available transitions
+            transitions_response = self.client.get_scene_transition_list()
+            available_transitions = [t['transitionName'] for t in transitions_response.transitions]
+
+            self.logger.debug(f"Available transitions: {available_transitions}")
+
+            # Try exact match first
+            if transition_name in available_transitions:
+                self.client.set_current_scene_transition(transition_name)
+                self.logger.info(f"Set scene transition to: {transition_name}")
+                return True
+
+            # Try case-insensitive partial match
+            transition_name_lower = transition_name.lower()
+            for available in available_transitions:
+                if transition_name_lower in available.lower():
+                    self.client.set_current_scene_transition(available)
+                    self.logger.info(f"Set scene transition to: {available} (matched '{transition_name}')")
+                    return True
+
+            # No match found - use first available transition as fallback
+            if available_transitions:
+                fallback = available_transitions[0]
+                self.client.set_current_scene_transition(fallback)
+                self.logger.warning(
+                    f"Transition '{transition_name}' not found, using fallback: {fallback}"
+                )
+                return True
+            else:
+                self.logger.error("No transitions available in OBS")
+                return False
+
+        except Exception as e:
+            self.logger.error(f"Failed to set transition '{transition_name}': {e}")
+            return False
+
     async def shutdown(self) -> None:
         """Shutdown OBS manager."""
         try:

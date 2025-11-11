@@ -32,7 +32,9 @@ class WebDAVClient:
         # State tracking
         self.last_sync_time = 0.0
         self.remote_file_cache: Dict[str, Dict] = {}
-        self.local_content_dir = settings.CONTENT_DIR
+        # For scheduling: sync to base directory to preserve subfolder structure
+        # This will download /vaeveriet_screens_slideshow/ from WebDAV to local vaeveriet_screens_slideshow/
+        self.local_content_dir = Path(settings.CONTENT_BASE_DIR) / "vaeveriet_screens_slideshow"
         
     async def test_connection(self) -> bool:
         """Test WebDAV connection to Synology NAS."""
@@ -75,8 +77,11 @@ class WebDAVClient:
 
             # Download new or updated files
             for remote_file, remote_info in remote_files.items():
-                # Just use the filename, not the full path
+                # Preserve subfolder structure in local path
                 local_path = self.local_content_dir / remote_file
+
+                # Create parent directories if needed
+                local_path.parent.mkdir(parents=True, exist_ok=True)
 
                 if await self._should_download_file(remote_file, remote_info, local_path):
                     if await self._download_file(remote_file, local_path):
@@ -129,62 +134,82 @@ class WebDAVClient:
             return False
     
     async def _get_remote_file_list(self) -> Optional[Dict[str, Dict]]:
-        """Get list of remote files with metadata."""
+        """Get list of remote files with metadata (recursively scans subdirectories)."""
         try:
-            # Get file list from WebDAV root path
-            remote_files = await asyncio.get_event_loop().run_in_executor(
-                None, self.client.ls, self.settings.WEBDAV_ROOT_PATH
-            )
-            
             file_info = {}
-            
-            for file_item in remote_files:
-                # Skip directory entries
-                if file_item.get('type') == 'directory':
-                    continue
-                
-                # Extract filename from path - remove any path prefixes
-                filename = file_item.get('name', '')
-                if not filename:
-                    continue
-                
-                # Remove path prefix if present (e.g., "sunday_service_slideshow/file.jpg" -> "file.jpg")
-                if '/' in filename:
-                    filename = filename.split('/')[-1]
-                
-                # Only include supported media files
-                if self._is_supported_media_file(filename):
-                    try:
-                        # Use file info from the ls response
-                        file_info[filename] = {
-                            'size': file_item.get('content_length', 0) or 0,
-                            'modified': file_item.get('modified', ''),
-                            'etag': file_item.get('etag', ''),
-                            'path': file_item.get('href', f'/{filename}')
-                        }
-                        
-                    except Exception as e:
-                        self.logger.warning(f"Could not get info for {filename}: {e}")
-            
+
+            # Recursively scan the WebDAV root path and all subdirectories
+            await self._scan_remote_directory(self.settings.WEBDAV_ROOT_PATH, "", file_info)
+
             self.logger.debug(f"Found {len(file_info)} remote media files")
             return file_info
-            
+
         except Exception as e:
             self.logger.error(f"Error getting remote file list: {e}")
             return None
-    
-    def _get_local_file_list(self) -> Set[str]:
-        """Get set of local media files."""
-        local_files = set()
-        
+
+    async def _scan_remote_directory(self, remote_path: str, relative_path: str, file_info: Dict[str, Dict]) -> None:
+        """
+        Recursively scan a remote directory and collect file information.
+
+        Args:
+            remote_path: Full WebDAV path to scan (e.g., "/vaeveriet_screens_slideshow/default_slideshow")
+            relative_path: Relative path from root (e.g., "default_slideshow")
+            file_info: Dictionary to populate with file information
+        """
         try:
-            for file_path in self.local_content_dir.iterdir():
+            # List contents of this directory
+            items = await asyncio.get_event_loop().run_in_executor(
+                None, self.client.ls, remote_path
+            )
+
+            for item in items:
+                item_name = item.get('name', '')
+                if not item_name:
+                    continue
+
+                # Extract just the filename/dirname (last component of path)
+                item_basename = item_name.rstrip('/').split('/')[-1]
+
+                # Build relative path for this item
+                if relative_path:
+                    item_relative_path = f"{relative_path}/{item_basename}"
+                else:
+                    item_relative_path = item_basename
+
+                if item.get('type') == 'directory':
+                    # Recursively scan subdirectory
+                    subdir_path = f"{remote_path.rstrip('/')}/{item_basename}"
+                    await self._scan_remote_directory(subdir_path, item_relative_path, file_info)
+                else:
+                    # It's a file - check if it's a supported media file
+                    if self._is_supported_media_file(item_basename):
+                        file_info[item_relative_path] = {
+                            'size': item.get('content_length', 0) or 0,
+                            'modified': item.get('modified', ''),
+                            'etag': item.get('etag', ''),
+                            'path': item.get('href', f"/{item_relative_path}")
+                        }
+
+        except Exception as e:
+            self.logger.warning(f"Error scanning remote directory {remote_path}: {e}")
+
+    def _get_local_file_list(self) -> Set[str]:
+        """Get set of local media files with relative paths (including subfolders)."""
+        local_files = set()
+
+        try:
+            # Recursively scan all subfolders
+            for file_path in self.local_content_dir.rglob('*'):
                 if file_path.is_file() and self._is_supported_media_file(file_path.name):
-                    local_files.add(file_path.name)
-                    
+                    # Get relative path from local_content_dir
+                    relative_path = file_path.relative_to(self.local_content_dir)
+                    # Convert to forward slashes for consistency
+                    local_files.add(str(relative_path).replace('\\', '/'))
+
         except Exception as e:
             self.logger.error(f"Error scanning local files: {e}")
-        
+
         return local_files
     
     def _is_supported_media_file(self, filename: str) -> bool:
@@ -223,34 +248,28 @@ class WebDAVClient:
     async def _download_file(self, remote_filename: str, local_path: Path) -> bool:
         """Download file from WebDAV to local path."""
         try:
-            # Use the full remote path from the file info
-            remote_file_info = None
-            for filename, info in self.remote_file_cache.items():
-                if filename == remote_filename:
-                    remote_file_info = info
-                    break
-            
-            if not remote_file_info:
-                # Construct the full path
-                remote_path = f"{self.settings.WEBDAV_ROOT_PATH}/{remote_filename}"
-            else:
-                remote_path = remote_file_info['path']
-            
+            # Construct the full remote path (webdav4 handles URL encoding internally)
+            remote_path = f"{self.settings.WEBDAV_ROOT_PATH}/{remote_filename}".replace('//', '/')
+            if not remote_path.startswith('/'):
+                remote_path = '/' + remote_path
+
+            self.logger.debug(f"Downloading from remote path: {remote_path}")
+
             # Create temporary file path
             temp_path = local_path.with_suffix(local_path.suffix + '.tmp')
-            
-            # Download file
+
+            # Download file (webdav4 library handles URL encoding automatically)
             await asyncio.get_event_loop().run_in_executor(
                 None, self.client.download_file, remote_path, str(temp_path)
             )
-            
+
             # Verify download completed successfully
             if temp_path.exists() and temp_path.stat().st_size > 0:
                 # Move temp file to final location
                 if local_path.exists():
                     local_path.unlink()
                 temp_path.rename(local_path)
-                
+
                 self.logger.debug(f"Successfully downloaded: {remote_filename}")
                 return True
             else:
@@ -260,7 +279,7 @@ class WebDAVClient:
                 return False
                 
         except Exception as e:
-            self.logger.error(f"Error downloading {remote_filename}: {e}")
+            self.logger.error(f"Error downloading {remote_filename}: {type(e).__name__}: {e}", exc_info=True)
             return False
 
     async def _cleanup_deletion_markers(self) -> None:
