@@ -42,8 +42,9 @@ content/
 
 # Configuration files with credentials
 # IMPORTANT: Keep your credentials safe!
-config/windows_test.env
-config/ubuntu_prod.env
+# Pattern-based protection: ignore all .env files except examples
+config/*.env
+!config/*.env.example
 
 # OS
 .DS_Store
