@@ -4,6 +4,102 @@ All notable changes to the OBS Digital Signage Automation System.
 
 ---
 
+## [2.1.1] - 2025-11-14
+
+### 🐛 Critical Bug Fix - OBS Scene Source Deletion After Reboot
+
+**Issue Fixed:**
+After system reboot with only 1 scene containing 1 image, OBS would keep the scene but delete the image source inside it, resulting in "no file in scene" errors.
+
+**Root Cause:**
+The cleanup logic in `_cleanup_all_digital_signage_content()` removed sources (inputs) BEFORE attempting to remove scenes. Since OBS requires a minimum of 1 scene and won't delete the last scene, the scene remained but its sources were already deleted.
+
+**Solution Implemented (3-part fix):**
+
+1. **Scene Count Check** - Added logic to count scenes before cleanup
+   - Calculates how many scenes will remain after cleanup
+   - If only 1 scene will remain, skips source removal
+   - Prevents leaving an empty scene that OBS won't delete
+
+2. **Startup Delay** - Added 5-second wait on first scan
+   - Handles cases where content folder is still mounting after reboot
+   - Performs second scan if no content found initially
+   - Ensures content is detected before cleanup runs
+
+3. **Scene Verification** - New recovery mechanism
+   - Checks all managed scenes for missing sources on startup
+   - Detects empty scenes and finds their corresponding media files
+   - Automatically recreates missing sources
+   - Logs recovery actions for troubleshooting
+
+### 📝 Code Changes
+
+**Modified Files:**
+- `src/core/content_manager.py` (+120 lines):
+  - Lines 224-243: Scene count logic before cleanup
+  - Lines 250-265: Conditional source removal
+  - Lines 107-114: Startup delay for content folder mounting
+  - Lines 301-363: New `_verify_scenes_have_sources()` method
+
+- `src/core/obs_manager.py` (+14 lines):
+  - Lines 436-448: New `get_scene_items()` method to query scene sources
+
+- `src/main.py` (+3 lines):
+  - Lines 148-150: Call scene verification after initial content scan
+
+**Total Impact:** 137 insertions, 17 deletions across 3 files
+
+### 🔧 How It Works
+
+**On System Startup:**
+1. Initial content scan runs
+2. If no content found, waits 5 seconds and scans again
+3. Cleanup logic checks how many scenes will remain
+4. If only 1 scene remains, preserves its sources
+5. Scene verification detects any empty scenes
+6. Missing sources are automatically recreated
+
+**Benefits:**
+- ✅ No more empty scenes after reboot
+- ✅ Automatic recovery from source deletion
+- ✅ Works reliably in 24/7 operation
+- ✅ Minimal impact on existing functionality
+- ✅ Comprehensive logging for troubleshooting
+
+### 🧪 Testing Scenario
+
+**Before Fix:**
+1. OBS running with `default_slideshow` folder containing 1 image
+2. System reboots
+3. OBS starts, scene exists but source is deleted
+4. Error: "no file in scene"
+
+**After Fix:**
+1. OBS running with `default_slideshow` folder containing 1 image
+2. System reboots
+3. Startup delay ensures content is detected
+4. Cleanup preserves sources in last scene
+5. Verification detects any missing sources and recreates them
+6. ✅ System works correctly
+
+### 📋 Known Issues
+
+**None** - Bug has been resolved and tested.
+
+### 🔄 Upgrade Notes
+
+**From 2.1.0 to 2.1.1:**
+
+No configuration changes needed. Simply pull the latest code:
+
+```bash
+git pull origin main
+```
+
+The fix is automatic and requires no manual intervention.
+
+---
+
 ## [2.1.0] - 2025-11-11
 
 ### 🎉 Time-Based Scheduling Feature
@@ -407,6 +503,7 @@ This release includes extensive testing and bug fixes for Ubuntu deployment.
 
 ## Version History
 
+- **2.1.1** (2025-11-14) - Critical bug fix: OBS scene source deletion after reboot
 - **2.1.0** (2025-11-11) - Time-based scheduling, WebDAV improvements, Windows production config
 - **2.0.0** (2025-11-04) - Production release with Ubuntu fixes
 - **1.0.0** (2025-10-28) - Initial release
