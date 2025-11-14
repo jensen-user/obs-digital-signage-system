@@ -98,19 +98,30 @@ class ContentManager:
         """Scan content directory and update OBS scenes."""
         try:
             self.logger.info("Scanning content directory...")
-            
+
             # Get current content
             new_media_files = await self._scan_content_directory()
-            
+
+            # On first scan, if no content found, wait and try again
+            # This handles cases where content folder is still mounting after reboot
+            is_first_scan = not self.managed_scenes and not self.managed_inputs
+            if is_first_scan and not new_media_files:
+                self.logger.info("First scan found no content - waiting 5 seconds for content folder to mount...")
+                await asyncio.sleep(5)
+                self.logger.info("Rescanning content directory...")
+                new_media_files = await self._scan_content_directory()
+                if new_media_files:
+                    self.logger.info(f"Found {len(new_media_files)} media files after delay")
+
             # Check if content has changed
             new_content_hash = self._calculate_content_hash(new_media_files)
             if new_content_hash == self.content_hash and self.media_files:
                 self.logger.debug("No content changes detected")
                 return
-            
+
             # Content has changed - update everything
             self.content_hash = new_content_hash
-            
+
             # On first run or if no managed content, do full cleanup
             if not self.managed_scenes and not self.managed_inputs:
                 await self._cleanup_all_digital_signage_content()
@@ -221,21 +232,48 @@ class ContentManager:
         try:
             self.logger.info("Cleaning up existing digital signage content...")
 
-            # First, get all inputs and remove matching ones
+            # Check how many scenes exist and will be removed (OBS minimum 1 scene constraint)
+            all_scenes = await self.obs_manager.get_scene_list()
+            total_scene_count = len(all_scenes) if all_scenes else 0
+
+            # Count scenes that match our pattern (will be removed)
+            scenes_to_remove_count = 0
+            for scene_name in all_scenes:
+                if (scene_name.endswith('_scene') or
+                    scene_name == 'waiting_for_content_scene' or
+                    'slideshow' in scene_name.lower() or
+                    'digital_signage' in scene_name.lower()):
+                    scenes_to_remove_count += 1
+
+            scenes_remaining = total_scene_count - scenes_to_remove_count
+
+            # If we're about to leave only 1 scene or 0 scenes, don't remove sources
+            # OBS won't let us delete the last scene, so we should keep its sources too
+            skip_input_removal = scenes_remaining <= 1 and total_scene_count > 0
+
+            if skip_input_removal:
+                self.logger.info(f"Only {scenes_remaining} scene(s) would remain after cleanup - keeping sources (OBS requires minimum 1 scene)")
+
+            # First, get all inputs and remove matching ones (unless skipping)
             all_inputs = await self.obs_manager.get_input_list()
             inputs_removed = 0
-            for input_name in all_inputs:
-                # Remove inputs that match our naming pattern
-                if input_name.endswith('_source'):
-                    try:
-                        await self.obs_manager.remove_input(input_name)
-                        inputs_removed += 1
-                        self.logger.debug(f"Removed old input: {input_name}")
-                    except Exception as e:
-                        self.logger.warning(f"Could not remove input {input_name}: {e}")
 
-            if inputs_removed > 0:
-                self.logger.info(f"Removed {inputs_removed} old inputs")
+            # Only remove inputs if we're not keeping the last scene's sources
+            if not skip_input_removal:
+                for input_name in all_inputs:
+                    # Remove inputs that match our naming pattern
+                    if input_name.endswith('_source'):
+                        try:
+                            await self.obs_manager.remove_input(input_name)
+                            inputs_removed += 1
+                            self.logger.debug(f"Removed old input: {input_name}")
+                        except Exception as e:
+                            self.logger.warning(f"Could not remove input {input_name}: {e}")
+
+                if inputs_removed > 0:
+                    self.logger.info(f"Removed {inputs_removed} old inputs")
+            else:
+                self.logger.debug("Skipping input removal to preserve last scene's sources")
 
             # Then, get all existing scenes and remove matching ones
             all_scenes = await self.obs_manager.get_scene_list()
@@ -259,6 +297,70 @@ class ContentManager:
 
         except Exception as e:
             self.logger.error(f"Full cleanup error: {e}")
+
+    async def _verify_scenes_have_sources(self) -> None:
+        """
+        Verify that all managed scenes have their sources.
+
+        This fixes the bug where sources disappear after reboot.
+        If a scene is missing its source but the media file exists,
+        we recreate the source.
+        """
+        try:
+            if not self.managed_scenes or not self.media_files:
+                self.logger.debug("No managed scenes or media files to verify")
+                return
+
+            self.logger.info("Verifying all scenes have sources...")
+            scenes_recovered = 0
+
+            for scene_name in self.managed_scenes:
+                # Get items (sources) in this scene
+                scene_items = await self.obs_manager.get_scene_items(scene_name)
+
+                if not scene_items:
+                    # Scene exists but has no sources - this is the bug!
+                    self.logger.warning(f"Scene '{scene_name}' has no sources - attempting recovery")
+
+                    # Find the media file that should be in this scene
+                    # Scene name format: {filename}_scene
+                    expected_filename = scene_name.replace('_scene', '')
+
+                    # Find matching media file
+                    matching_media = None
+                    for media_file in self.media_files:
+                        if media_file.filename == expected_filename:
+                            matching_media = media_file
+                            break
+
+                    if matching_media:
+                        # Recreate the source for this scene
+                        source_name = f"{matching_media.filename}_source"
+                        self.logger.info(f"Recreating source '{source_name}' in scene '{scene_name}'")
+
+                        # Add the media source to the scene
+                        await self.obs_manager.create_media_source(
+                            scene_name=scene_name,
+                            source_name=source_name,
+                            file_path=str(matching_media.path)
+                        )
+
+                        # Track the recovered input
+                        if source_name not in self.managed_inputs:
+                            self.managed_inputs.add(source_name)
+
+                        scenes_recovered += 1
+                        self.logger.info(f"✓ Recovered scene '{scene_name}' with source '{source_name}'")
+                    else:
+                        self.logger.warning(f"Could not find media file for scene '{scene_name}'")
+
+            if scenes_recovered > 0:
+                self.logger.info(f"✓ Scene verification complete - recovered {scenes_recovered} scene(s)")
+            else:
+                self.logger.info("✓ Scene verification complete - all scenes have sources")
+
+        except Exception as e:
+            self.logger.error(f"Scene verification failed: {e}")
 
     async def _cleanup_orphaned_scenes(self) -> None:
         """

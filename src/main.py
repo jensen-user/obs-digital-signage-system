@@ -144,7 +144,11 @@ class DigitalSignageSystem:
             # Scan local content and setup OBS scenes
             self.logger.info("Scanning local content...")
             await self.content_manager.scan_and_update_content()
-            
+
+            # Verify all scenes have sources (fixes reboot bug where sources disappear)
+            await self.content_manager._verify_scenes_have_sources()
+            self.logger.info("Scene verification completed")
+
             # Initialize background audio
             self.logger.info("Setting up background audio...")
             await self.audio_manager.scan_and_start_audio()

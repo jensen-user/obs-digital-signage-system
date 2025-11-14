@@ -433,6 +433,20 @@ class OBSManager:
             self.logger.error(f"Failed to get input list: {e}")
             return []
 
+    async def get_scene_items(self, scene_name: str) -> List:
+        """
+        Get list of items (sources) in a scene.
+
+        Returns:
+            List of scene items, or empty list if scene doesn't exist or has no items.
+        """
+        try:
+            response = self.client.get_scene_item_list(sceneName=scene_name)
+            return response.scene_items if hasattr(response, 'scene_items') else []
+        except Exception as e:
+            self.logger.debug(f"Failed to get scene items for '{scene_name}': {e}")
+            return []
+
     # Input Management Methods
     
     async def create_input(self, scene_name: str, input_name: str, input_kind: str, input_settings: Dict[str, Any]) -> bool:
